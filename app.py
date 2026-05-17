@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
+import hashlib
 
 from analysis import (
     load_data, compute_macro_metrics, compute_department_analysis,
@@ -28,6 +29,9 @@ st.set_page_config(
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ═══════════════════ Authentication ═══════════════════
+# Hardcoded hash for security (SHA-256 of H0D@RRU##199)
+EXPECTED_HASH = "fa562776608fbe098e60527308e15fbc9a880ac8c0a40957a883663be89c3ec4"
+
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
@@ -36,13 +40,18 @@ if not st.session_state.authenticated:
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        pwd = st.text_input("Enter Password to Access Dashboard:", type="password")
-        if st.button("Login", use_container_width=True):
-            if pwd == "H0D@RRU##199":
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("Incorrect Password. Please try again.")
+        with st.form("login_form"):
+            pwd = st.text_input("Enter Password to Access Dashboard:", type="password")
+            submit = st.form_submit_button("Login", use_container_width=True)
+            
+            if submit:
+                # Hash the input and compare
+                pwd_hash = hashlib.sha256(pwd.encode()).hexdigest()
+                if pwd_hash == EXPECTED_HASH:
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect Password. Please try again.")
     st.stop()
 
 # ═══════════════════ Plotly Theme ═══════════════════
@@ -98,6 +107,11 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(f"<p style='font-size:0.75rem;color:rgba(255,255,255,0.25);'>Last updated: {pd.Timestamp.now().strftime('%d %B %Y %H:%M')}</p>",
                 unsafe_allow_html=True)
+    
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    if st.button("🚪 Logout", use_container_width=True):
+        st.session_state.authenticated = False
+        st.rerun()
 
 # ═══════════════════ Header ═══════════════════
 st.markdown("""
