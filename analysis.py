@@ -11,7 +11,7 @@ from collections import Counter
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
-def load_data(csv_path: str = r"d:\HOD\meetings_data.csv") -> pd.DataFrame:
+def load_data(csv_path: str = "meetings_data.csv") -> pd.DataFrame:
     """Load and preprocess the meetings data."""
     df = pd.read_csv(csv_path)
     
