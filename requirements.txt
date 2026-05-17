@@ -1,0 +1,9 @@
+python-docx
+pandas
+pdfplumber
+openpyxl
+streamlit
+plotly
+scikit-learn
+nltk
+wordcloud
