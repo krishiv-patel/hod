@@ -18,12 +18,8 @@ from parse_index import build_meeting_index
 BASE_DIR = r"d:\HOD\HOD Minutes (Updated on 24 March 2026)\HOD Minutes (Updated on 24 March 2026)"
 OUTPUT_CSV = r"d:\HOD\meetings_data.csv"
 
-# Files to skip (index files, not meeting minutes)
-SKIP_FILES = {
-    "HOD Index - 1 to 139.docx",
-    "HOD Index - 140 to 288.docx",
-    "HOD Index - 289 to .....docx",
-}
+# Files to skip (none anymore, per user request)
+SKIP_FILES = set()
 
 # ---------- Status Heuristics ----------
 
@@ -72,26 +68,32 @@ def extract_meeting_number_from_filename(filename: str) -> list[int]:
     """Extract meeting number(s) from filename."""
     name = os.path.splitext(filename)[0]
     
+    if "Index" in name:
+        # Give them a special meeting number (e.g. 9001, 9140) so they don't pollute real meetings
+        m = re.search(r'(\d+)', name)
+        return [9000 + int(m.group(1))] if m else [9000]
+    
     # Combined files: "249 to 270 HOD MOM" or "271 272 273 HOD MoM"
-    range_match = re.match(r'(\d+)\s+to\s+(\d+)', name)
+    range_match = re.search(r'(\d+)\s+to\s+(\d+)', name, re.IGNORECASE)
     if range_match:
         return list(range(int(range_match.group(1)), int(range_match.group(2)) + 1))
     
-    multi_match = re.match(r'(\d+)\s+(\d+)\s+(\d+)', name)
+    multi_match = re.search(r'(\d+)\s+(\d+)\s+(\d+)', name)
     if multi_match:
         return [int(multi_match.group(i)) for i in range(1, 4)]
-    
-    # Standard: "1st HOD MoM", "134th HOD MoM", "213 HOD MOM", "298 HOD MoM (1st Apr'26)"
-    m = re.match(r'(\d+)', name)
-    if m:
-        return [int(m.group(1))]
     
     # Draft files: "Draft MoM of 183rd HOD Meeting"
     m = re.search(r'(\d+)\s*(?:st|nd|rd|th)?\s*HOD', name, re.IGNORECASE)
     if m:
         return [int(m.group(1))]
     
-    return []
+    # Standard: "1st HOD MoM", "134th HOD MoM", "213 HOD MOM", "298 HOD MoM (1st Apr'26)"
+    m = re.search(r'(\d+)', name)
+    if m:
+        return [int(m.group(1))]
+    
+    # Absolute fallback to prevent skipping
+    return [0]
 
 
 def extract_date_from_paragraphs(paragraphs: list) -> str | None:
