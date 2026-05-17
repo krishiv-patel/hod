@@ -748,12 +748,18 @@ def main():
     print(f"\nSaving {len(all_records)} records to CSV...")
     df = pd.DataFrame(all_records)
     
+    # Deduplicate tasks (handles cases where both Draft and Final MoM exist for the same meeting)
+    initial_count = len(df)
+    df = df.drop_duplicates(subset=['meeting_number', 'task_description'], keep='last')
+    
     # Sort by meeting number and sr_no
     df['_sort_key'] = df['meeting_number'] * 1000 + df['sr_no'].apply(
         lambda x: float(x.split('.')[-1]) if '.' in str(x) else 0
     )
     df = df.sort_values('_sort_key').drop(columns=['_sort_key'])
     df.to_csv(OUTPUT_CSV, index=False, encoding='utf-8-sig')
+    
+    print(f"Dropped {initial_count - len(df)} duplicate tasks.")
     
     # Summary
     print("\n" + "=" * 60)

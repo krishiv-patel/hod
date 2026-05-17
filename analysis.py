@@ -54,12 +54,16 @@ def normalize_department(name: str) -> str:
     
     name = name.strip()
     
+    # Remove common academic/military titles to unify names
+    name = re.sub(r'^(Dr|Prof|Mr|Ms|Mrs|Lt\sGen|Col|Brig|Shri)\.?\s+', '', name, flags=re.IGNORECASE)
+    name = name.replace('.', ' ').replace('  ', ' ').strip()
+    
     # Known department mappings
     mappings = {
         'Pro VC': ['pro vc', 'provc', 'pro-vc', 'pvc'],
         'University Dean': ['university dean', 'dean office', 'dean r&p', 'dean r&p'],
         'Registrar': ['registrar'],
-        'All School Directors': ['all school director', 'all director'],
+        'All School Directors': ['all school director', 'all director', 'all school directors'],
         'Finance': ['director-finance', 'finance', 'director finance'],
         'HR Branch': ['ar-hr', 'hr branch', 'hr'],
         'ICTB/IT': ['head-ictb', 'ict', 'it branch', 'director-sitaics', 'sitaics'],
@@ -76,6 +80,9 @@ def normalize_department(name: str) -> str:
         for kw in keywords:
             if kw in name_lower:
                 return group
+    
+    # Capitalize cleanly
+    name = name.title()
     
     # If name is short enough, use as-is (likely a person name)
     if len(name) <= 40:
