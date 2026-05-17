@@ -501,79 +501,101 @@ def parse_pdf_file(filepath: str, meeting_nums: list[int], meeting_index: dict) 
         import pdfplumber
         
         with pdfplumber.open(filepath) as pdf:
+            all_text = ""
             for page in pdf.pages:
-                # Try to extract tables first
+                all_text += (page.extract_text() or "") + "\n"
+                
                 tables = page.extract_tables()
                 if tables:
                     for table in tables:
-                        for row in table:
-                            if not row or len(row) < 2:
-                                continue
+                        # Check header
+                        if not table or not table[0]: continue
+                        header = ' '.join(str(c).lower() for c in table[0] if c)
+                        is_format_b = any(kw in header for kw in ['hod', 'name', 'discussed', 'remarks'])
+                        
+                        item_count = 0
+                        for row in table[1:] if is_format_b else table:
+                            if not row or len(row) < 2: continue
                             
-                            sr_no_text = (row[0] or '').strip()
-                            sr_match = re.match(r'(\d+)[.\s]*(\d+)?', sr_no_text)
-                            if not sr_match:
-                                continue
-                            
-                            # Skip headers
-                            if any(h in sr_no_text.lower() for h in ['sr', 'no', 'sl']):
-                                continue
-                            
-                            doc_meeting_num = int(sr_match.group(1))
-                            item_num = sr_match.group(2) or '0'
-                            sr_no = f"{doc_meeting_num}.{int(item_num):02d}"
-                            
-                            task_text = (row[1] or '').strip() if len(row) > 1 else ''
-                            concerned = (row[2] or '').strip() if len(row) > 2 else 'Not Specified'
-                            
-                            if not task_text or len(task_text) < 5:
-                                continue
-                            
-                            # Get date from index
-                            idx_data = meeting_index.get(doc_meeting_num, {})
-                            date = idx_data.get('date', '')
-                            
-                            records.append({
-                                'meeting_number': doc_meeting_num,
-                                'meeting_date': date,
-                                'year': date[:4] if date else '',
-                                'sr_no': sr_no,
-                                'task_description': re.sub(r'\s+', ' ', task_text).strip(),
-                                'concerned_unit': re.sub(r'\s+', ' ', concerned).strip(),
-                                'task_status': classify_status(task_text),
-                                'source_file': filename,
-                                'format_type': 'PDF',
-                            })
-                else:
-                    # Fallback: extract text and parse like Format A
-                    text = page.extract_text()
-                    if text:
-                        for meeting_num in meeting_nums:
-                            idx_data = meeting_index.get(meeting_num, {})
-                            date = idx_data.get('date', '')
-                            
-                            items = re.split(r'\n(?=\d+\.\s)', text)
-                            item_count = 0
-                            for item in items:
-                                m = re.match(r'(\d+)\.\s*(.*)', item, re.DOTALL)
-                                if not m:
-                                    continue
-                                task_text = m.group(2).strip()
-                                if len(task_text) < 5:
-                                    continue
-                                item_count += 1
-                                sr_no = f"{meeting_num}.{item_count:02d}"
+                            if is_format_b:
+                                hod_name = str(row[0] or '').strip()
+                                discussed = str(row[1] or '').strip()
+                                remarks = str(row[2] or '').strip() if len(row) > 2 else ''
+                                
+                                if not discussed or len(discussed) < 5: continue
+                                
+                                points = re.split(r'(?:[·•]\s*|\n\d+\.\s*|\n(?=[A-Z]))', discussed)
+                                points = [p.strip() for p in points if p.strip() and len(p.strip()) > 5]
+                                if not points: points = [discussed]
+                                
+                                for point in points:
+                                    item_count += 1
+                                    doc_meeting_num = meeting_nums[0] if meeting_nums else 0
+                                    sr_no = f"{doc_meeting_num}.{item_count:02d}"
+                                    
+                                    hod_clean = hod_name.split('\n')[0].strip()
+                                    combined = point
+                                    if remarks and len(remarks) > 5: combined += f" [Remarks: {remarks[:300]}]"
+                                    
+                                    date = meeting_index.get(doc_meeting_num, {}).get('date', '')
+                                    
+                                    records.append({
+                                        'meeting_number': doc_meeting_num,
+                                        'meeting_date': date,
+                                        'year': date[:4] if date else '',
+                                        'sr_no': sr_no,
+                                        'task_description': re.sub(r'\s+', ' ', combined).strip(),
+                                        'concerned_unit': hod_clean,
+                                        'task_status': classify_status(combined),
+                                        'source_file': filename,
+                                        'format_type': 'PDF-B',
+                                    })
+                            else:
+                                # Format C logic
+                                sr_no_text = str(row[0] or '').strip()
+                                sr_match = re.match(r'(\d+)[.\s]*(\d+)?', sr_no_text)
+                                if not sr_match: continue
+                                if any(h in sr_no_text.lower() for h in ['sr', 'no', 'sl']): continue
+                                
+                                doc_meeting_num = int(sr_match.group(1))
+                                item_num = sr_match.group(2) or '0'
+                                sr_no = f"{doc_meeting_num}.{int(item_num):02d}"
+                                
+                                task_text = str(row[1] or '').strip() if len(row) > 1 else ''
+                                concerned = str(row[2] or '').strip() if len(row) > 2 else 'Not Specified'
+                                
+                                if not task_text or len(task_text) < 5: continue
+                                
+                                date = meeting_index.get(doc_meeting_num, {}).get('date', '')
+                                
                                 records.append({
-                                    'meeting_number': meeting_num,
+                                    'meeting_number': doc_meeting_num,
                                     'meeting_date': date,
                                     'year': date[:4] if date else '',
                                     'sr_no': sr_no,
                                     'task_description': re.sub(r'\s+', ' ', task_text).strip(),
-                                    'concerned_unit': 'Not Specified',
+                                    'concerned_unit': re.sub(r'\s+', ' ', concerned).strip(),
                                     'task_status': classify_status(task_text),
                                     'source_file': filename,
-                                    'format_type': 'PDF',
+                                    'format_type': 'PDF-C',
                                 })
+                                
+            # If still no records extracted, dump as RAW
+            if not records and all_text.strip() and meeting_nums:
+                doc_meeting_num = meeting_nums[0]
+                date = meeting_index.get(doc_meeting_num, {}).get('date', '')
+                records.append({
+                    'meeting_number': doc_meeting_num,
+                    'meeting_date': date,
+                    'year': date[:4] if date else '',
+                    'sr_no': f"{doc_meeting_num}.00",
+                    'task_description': all_text[:2000].strip(),
+                    'concerned_unit': 'Not Specified',
+                    'task_status': 'Recorded',
+                    'source_file': filename,
+                    'format_type': 'RAW',
+                })
+                
     except ImportError:
         print("WARNING: pdfplumber not installed. Skipping PDF files.")
     except Exception as e:
@@ -675,13 +697,15 @@ def main():
     # Step 2: Collect all files
     print("\n[2/3] Scanning files...")
     all_files = []
-    for fname in os.listdir(BASE_DIR):
-        if fname in SKIP_FILES:
-            continue
-        fpath = os.path.join(BASE_DIR, fname)
-        if os.path.isdir(fpath):
-            continue
-        all_files.append((fname, fpath))
+    for root, dirs, files in os.walk(BASE_DIR):
+        for fname in files:
+            if fname in SKIP_FILES:
+                continue
+            # Skip hidden/temporary word files
+            if fname.startswith('~$'):
+                continue
+            fpath = os.path.join(root, fname)
+            all_files.append((fname, fpath))
     
     docx_files = [(f, p) for f, p in all_files if f.lower().endswith('.docx')]
     pdf_files = [(f, p) for f, p in all_files if f.lower().endswith('.pdf')]
