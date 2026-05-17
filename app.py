@@ -27,6 +27,24 @@ st.set_page_config(
 )
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+# ═══════════════════ Authentication ═══════════════════
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.markdown("<h2 style='text-align: center; margin-top: 100px; color: rgba(255,255,255,0.9);'>🔒 RRU HOD Dashboard Login</h2>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        pwd = st.text_input("Enter Password to Access Dashboard:", type="password")
+        if st.button("Login", use_container_width=True):
+            if pwd == "H0D@RRU##199":
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Incorrect Password. Please try again.")
+    st.stop()
+
 # ═══════════════════ Plotly Theme ═══════════════════
 GC = 'rgba(255,255,255,0.05)'
 COLORS = ['#c084fc', '#60a5fa', '#34d399', '#fbbf24', '#f472b6',
