@@ -102,7 +102,7 @@ with st.sidebar:
 # ═══════════════════ Header ═══════════════════
 st.markdown("""
 <div class="dashboard-header">
-    <h1>🏛️ RRU HOD Meeting Intelligence Dashboard</h1>
+    <h1>🏛️ RRU HOD Meeting Insights Dashboard</h1>
     <p>Rashtriya Raksha University — Heads of Department Meeting Analytics &bull; {s} to {e} &bull; {m} Meetings &bull; {t:,} Action Items</p>
 </div>
 """.format(s=metrics['date_range_start'], e=metrics['date_range_end'],
